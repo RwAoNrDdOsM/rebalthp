@@ -1,0 +1,11 @@
+mod = [
+	"rebalthp"
+]
+
+package = [
+	"resource_packages/rebalthp/rebalthp"
+]
+
+lua = [
+	"scripts/mods/rebalthp/*"
+]
