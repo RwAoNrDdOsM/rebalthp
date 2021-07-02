@@ -10,7 +10,8 @@ mod:add_text("smiter_name", "Smiter")
 mod:add_text("enhanced_power_name", "Enhanced Power")
 mod:add_text("assassin_name", "Assassin")
 mod:add_text("bulwark_name", "Bulwark")
-mod:add_text("tank_unbalance_desc", "Enemies that you stagger take 10% more damage for 5 seconds. Deal 20% more damage to staggered enemies.")
+mod:add_text("rebalthp_tank_unbalance_desc", "Enemies you stagger take 10%% more damage from all sources for 5 seconds.\n\nDeal 20%% more damage to staggered enemies, increased to 40%% against targets afflicted by more than one stagger effect.")
+mod:add_text("rebalthp_finesse_unbalance_desc", "Deal 20%% more damage to staggered enemies.\n\nEach hit against a staggered enemy adds another count of stagger. Headshots instead inflict 40%% bonus damage, as do strikes against enemies afflicted by more than one stagger effect.")
 
 -- Careers
 --Huntsman
@@ -72,7 +73,7 @@ mod:modify_talent("es_huntsman", 3, 2, {
 })
 mod:modify_talent("es_huntsman", 3, 3, {
 	name = "assassin_name",
-	description = "finesse_unbalance_desc",
+	description = "rebalthp_finesse_unbalance_desc",
 	buffs = {
 		"rebalthp_finesse_unbalance"
 	},
@@ -147,7 +148,7 @@ mod:modify_talent("es_knight", 3, 2, {
 })
 mod:modify_talent("es_knight", 3, 3, {
 	name = "bulwark_name",
-	description = "tank_unbalance_desc",
+	description = "rebalthp_tank_unbalance_desc",
 	buffs = {
 		"rebalthp_tank_unbalance"
 	},
@@ -229,7 +230,7 @@ mod:modify_talent("es_mercenary", 3, 2, {
 })
 mod:modify_talent("es_mercenary", 3, 3, {
 	name = "assassin_name",
-	description = "finesse_unbalance_desc",
+	description = "rebalthp_finesse_unbalance_desc",
 	buffs = {
 		"rebalthp_finesse_unbalance"
 	},
@@ -304,7 +305,7 @@ mod:modify_talent("es_questingknight", 3, 2, {
 })
 mod:modify_talent("es_questingknight", 3, 3, {
 	name = "bulwark_name",
-	description = "tank_unbalance_desc",
+	description = "rebalthp_tank_unbalance_desc",
 	buffs = {
 		"rebalthp_tank_unbalance"
 	},
@@ -386,7 +387,7 @@ mod:modify_talent("dr_ironbreaker", 3, 2, {
 })
 mod:modify_talent("dr_ironbreaker", 3, 3, {
 	name = "bulwark_name",
-	description = "tank_unbalance_desc",
+	description = "rebalthp_tank_unbalance_desc",
 	buffs = {
 		"rebalthp_tank_unbalance"
 	},
@@ -468,7 +469,7 @@ mod:modify_talent("dr_slayer", 3, 2, {
 })
 mod:modify_talent("dr_slayer", 3, 3, {
 	name = "assassin_name",
-	description = "finesse_unbalance_desc",
+	description = "rebalthp_finesse_unbalance_desc",
 	buffs = {
 		"rebalthp_finesse_unbalance"
 	},
@@ -543,7 +544,7 @@ mod:modify_talent("dr_ranger", 3, 2, {
 })
 mod:modify_talent("dr_ranger", 3, 3, {
 	name = "assassin_name",
-	description = "finesse_unbalance_desc",
+	description = "rebalthp_finesse_unbalance_desc",
 	buffs = {
 		"rebalthp_finesse_unbalance"
 	},
@@ -618,7 +619,7 @@ mod:modify_talent("dr_engineer", 3, 2, {
 })
 mod:modify_talent("dr_engineer", 3, 3, {
 	name = "bulwark_name",
-	description = "tank_unbalance_desc",
+	description = "rebalthp_tank_unbalance_desc",
 	buffs = {
 		"rebalthp_tank_unbalance"
 	},
@@ -700,7 +701,7 @@ mod:modify_talent("we_shade", 3, 2, {
 })
 mod:modify_talent("we_shade", 3, 3, {
 	name = "assassin_name",
-	description = "finesse_unbalance_desc",
+	description = "rebalthp_finesse_unbalance_desc",
 	buffs = {
 		"rebalthp_finesse_unbalance"
 	},
@@ -775,7 +776,7 @@ mod:modify_talent("we_maidenguard", 3, 2, {
 })
 mod:modify_talent("we_maidenguard", 3, 3, {
 	name = "assassin_name",
-	description = "finesse_unbalance_desc",
+	description = "rebalthp_finesse_unbalance_desc",
 	buffs = {
 		"rebalthp_finesse_unbalance"
 	},
@@ -850,7 +851,7 @@ mod:modify_talent("we_waywatcher", 3, 2, {
 })
 mod:modify_talent("we_waywatcher", 3, 3, {
 	name = "assassin_name",
-	description = "finesse_unbalance_desc",
+	description = "rebalthp_finesse_unbalance_desc",
 	buffs = {
 		"rebalthp_finesse_unbalance"
 	},
@@ -925,7 +926,7 @@ mod:modify_talent("we_thornsister", 3, 2, {
 })
 mod:modify_talent("we_thornsister", 3, 3, {
 	name = "assassin_name",
-	description = "finesse_unbalance_desc",
+	description = "rebalthp_finesse_unbalance_desc",
 	buffs = {
 		"rebalthp_finesse_unbalance"
 	},
@@ -1000,7 +1001,7 @@ mod:modify_talent("wh_zealot", 3, 2, {
 })
 mod:modify_talent("wh_zealot", 3, 3, {
 	name = "assassin_name",
-	description = "finesse_unbalance_desc",
+	description = "rebalthp_finesse_unbalance_desc",
 	buffs = {
 		"rebalthp_finesse_unbalance"
 	},
@@ -1075,7 +1076,7 @@ mod:modify_talent("wh_bountyhunter", 3, 2, {
 })
 mod:modify_talent("wh_bountyhunter", 3, 3, {
 	name = "assassin_name",
-	description = "finesse_unbalance_desc",
+	description = "rebalthp_finesse_unbalance_desc",
 	buffs = {
 		"rebalthp_finesse_unbalance"
 	},
@@ -1150,7 +1151,7 @@ mod:modify_talent("wh_captain", 3, 2, {
 })
 mod:modify_talent("wh_captain", 3, 3, {
 	name = "assassin_name",
-	description = "finesse_unbalance_desc",
+	description = "rebalthp_finesse_unbalance_desc",
 	buffs = {
 		"rebalthp_finesse_unbalance"
 	},
@@ -1225,7 +1226,7 @@ mod:modify_talent("bw_scholar", 3, 2, {
 })
 mod:modify_talent("bw_scholar", 3, 3, {
 	name = "bulwark_name",
-	description = "tank_unbalance_desc",
+	description = "rebalthp_tank_unbalance_desc",
 	buffs = {
 		"rebalthp_tank_unbalance"
 	},
@@ -1307,7 +1308,7 @@ mod:modify_talent("bw_adept", 3, 2, {
 })
 mod:modify_talent("bw_adept", 3, 3, {
 	name = "bulwark_name",
-	description = "tank_unbalance_desc",
+	description = "rebalthp_tank_unbalance_desc",
 	buffs = {
 		"rebalthp_tank_unbalance"
 	},
@@ -1389,7 +1390,7 @@ mod:modify_talent("bw_unchained", 3, 2, {
 })
 mod:modify_talent("bw_unchained", 3, 3, {
 	name = "bulwark_name",
-	description = "tank_unbalance_desc",
+	description = "rebalthp_tank_unbalance_desc",
 	buffs = {
 		"rebalthp_tank_unbalance"
 	},

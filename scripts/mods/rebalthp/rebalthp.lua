@@ -29,7 +29,7 @@ mod:hook("Localize", function(func, text_id)
     return func(text_id)
 end)
 
--- Add thp on enemy death?
+-- Fixed getting unlimited thp on Vanguard when using slam
 mod:hook_origin(ActionShieldSlam, "_hit", function (self, world, can_damage, owner_unit, current_action)
 	local network_manager = Managers.state.network
 	local physics_world = World.get_data(world, "physics_world")
@@ -267,12 +267,12 @@ mod:hook_origin(ActionShieldSlam, "_hit", function (self, world, can_damage, own
 	self.state = "hit"
 end)
 
+-- Fixed Vanguard not proccing when you killed an enemy which is staggered
 local damage_source_procs = {
 	charge_ability_hit_blast = "on_charge_ability_hit_blast",
 	charge_ability_hit = "on_charge_ability_hit"
 }
 local unit_get_data = Unit.get_data
-
 mod:hook_origin(DamageUtils, "server_apply_hit", function (t, attacker_unit, target_unit, hit_zone_name, hit_position, attack_direction, hit_ragdoll_actor, damage_source, power_level, damage_profile, target_index, boost_curve_multiplier, is_critical_strike, can_damage, can_stagger, blocking, shield_breaking_hit, backstab_multiplier, first_hit, total_hits, source_attacker_unit)
 	local buff_extension = ScriptUnit.has_extension(attacker_unit, "buff_system")
 
@@ -373,7 +373,7 @@ mod:hook_origin(DamageUtils, "server_apply_hit", function (t, attacker_unit, tar
 	end
 end)
 
--- Buff Changes
+-- Buffs
 local function merge(dst, src)
     for k, v in pairs(src) do
         dst[k] = v
@@ -405,11 +405,40 @@ mod:add_buff_template("rebalthp_regrowth", {
 	bonus_hs = 2,
 	bonus_crit = 1,
 })
+mod:add_proc_function("rebalthp_heal_stagger_targets_on_melee", function (player, buff, params)
+	if not Managers.state.network.is_server then
+		return
+	end
+
+	local player_unit = player.player_unit
+
+	if ALIVE[player_unit] then
+		local hit_unit = params[1]
+		local damage_profile = params[2]
+		local attack_type = damage_profile.charge_value
+		local stagger_value = params[6]
+		local stagger_type = params[4]
+		local target_index = params[8]
+		local breed = AiUtils.unit_breed(hit_unit)
+		local multiplier = buff.multiplier
+		local is_push = damage_profile.is_push
+		local stagger_calulation = stagger_type or stagger_value
+		local heal_amount = stagger_value * multiplier
+
+		if is_push then
+			heal_amount = 0.6
+		end
+
+		if target_index and target_index < 5 and breed and not breed.is_hero and (attack_type == "light_attack" or attack_type == "heavy_attack" or attack_type == "action_push") then
+			DamageUtils.heal_network(player_unit, player_unit, heal_amount, "heal_from_proc")
+		end
+	end
+end)
 mod:add_buff_template("rebalthp_vanguard", {
 	multiplier = 1,
 	name = "vanguard",
 	event_buff = true,
-	buff_func = "heal_stagger_targets_on_melee",
+	buff_func = "rebalthp_heal_stagger_targets_on_melee",
 	event = "on_stagger",
 	perk = "tank_healing"
 })
@@ -423,41 +452,13 @@ mod:add_buff_template("rebalthp_reaper", {
 	max_targets = 5,
 	bonus = 0.25
 })
-mod:add_proc_function("heal_percent_of_damage_dealt_on_melee", function (player, buff, params)
-	if not Managers.state.network.is_server then
-		return
-	end
-
-	local player_unit = player.player_unit
-
-	if Unit.alive(player_unit) then
-		local buff_type = params[6]
-
-		if buff_type == "MELEE_1H" or buff_type == "MELEE_2H" then
-			local hit_unit = params[1]
-			local damage_amount = params[2]
-			local hit_unit_health_extension = ScriptUnit.extension(hit_unit, "health_system")
-
-			if hit_unit_health_extension and hit_unit_health_extension:current_health() <= damage_amount then
-				local breed = AiUtils.unit_breed(hit_unit)
-
-				if breed and not breed.is_hero then
-					local heal_amount = breed.bloodlust_health or 0
-
-					DamageUtils.heal_network(player_unit, player_unit, heal_amount, "heal_from_proc")
-				end
-			end
-		end
-	end
-end)
 mod:add_buff_template("rebalthp_bloodlust", {
-	multiplier = 0.45,
+	multiplier = 0.2,
 	name = "bloodlust",
 	event_buff = true,
-	buff_func = "heal_percent_of_damage_dealt_on_melee",
-	event = "on_player_damage_dealt",
+	buff_func = "heal_percentage_of_enemy_hp_on_melee_kill",
+	event = "on_kill",
 	perk = "smiter_healing",
-	heal_cap = 0.25
 })
 mod:add_buff_template("rebalthp_smiter_unbalance", {
 	max_display_multiplier = 0.4,
@@ -471,13 +472,14 @@ mod:add_buff_template("rebalthp_power_level_unbalance", {
 	stat_buff = "power_level",
 	multiplier = 0.1 -- 0.075
 }) 
-mod:add_proc_function("heal_percent_of_damage_dealt_on_melee", function (player, buff, params)
+mod:add_proc_function("rebalthp_unbalance_debuff_on_stagger", function (player, buff, params)
 	local player_unit = player.player_unit
 	local hit_unit = params[1]
 	local is_dummy = Unit.get_data(hit_unit, "is_dummy")
+	local buff_type = params[7]
 
-	if Unit.alive(player_unit) and (is_dummy or Unit.alive(hit_unit)) and Managers.player.is_server then
-		local buff_extension = ScriptUnit.extension(hit_unit, "buff_system")
+	if Unit.alive(player_unit) and (is_dummy or Unit.alive(hit_unit)) and buff_type == "MELEE_1H" or buff_type == "MELEE_2H" then
+		local buff_extension = ScriptUnit.extension(player_unit, "buff_system")
 
 		if buff_extension then
 			buff_extension:add_buff("rebalthp_tank_unbalance_buff")
@@ -488,7 +490,7 @@ mod:add_buff_template("rebalthp_tank_unbalance", {
 	max_display_multiplier = 0.4,
 	name = "tank_unbalance",
 	event_buff = true,
-	buff_func = "heal_percent_of_damage_dealt_on_melee",
+	buff_func = "rebalthp_unbalance_debuff_on_stagger",
 	event = "on_stagger",
 	display_multiplier = 0.2
 })
@@ -498,7 +500,8 @@ mod:add_buff_template("rebalthp_tank_unbalance_buff", {
 	stat_buff = "power_level",
 	max_stacks = 1,
 	duration = 5,
-	multiplier = 0.1
+	multiplier = 0.1,
+	icon = "icons_placeholder",
 })
 mod:add_buff_template("rebalthp_finesse_unbalance", {
 	max_display_multiplier = 0.4,
@@ -506,6 +509,429 @@ mod:add_buff_template("rebalthp_finesse_unbalance", {
 	display_multiplier = 0.2,
 	perk = "finesse_stagger_damage"
 })
+
+-- Stagger Talent Changes
+local function apply_buffs_to_stagger_damage(attacker_unit, target_unit, target_index, hit_zone, is_critical_strike, stagger_number)
+	local attacker_buff_extension = ScriptUnit.has_extension(attacker_unit, "buff_system")
+	local new_stagger_number = stagger_number
+
+	if attacker_buff_extension then
+		local finesse_perk = attacker_buff_extension:has_buff_perk("finesse_stagger_damage")
+		local smiter_perk = attacker_buff_extension:has_buff_perk("smiter_stagger_damage")
+		local mainstay_perk = attacker_buff_extension:has_buff_perk("linesman_stagger_damage")
+
+		if mainstay_perk and new_stagger_number > 0 then
+			new_stagger_number = new_stagger_number + 1
+		elseif (hit_zone == "head" or hit_zone == "neck") and finesse_perk then
+			new_stagger_number = 2
+		elseif smiter_perk then
+			if target_index and target_index <= 1 then
+				new_stagger_number = math.max(1, new_stagger_number)
+			else
+				new_stagger_number = stagger_number
+			end
+		end
+	end
+
+	return new_stagger_number
+end
+
+local function do_damage_calculation(attacker_unit, damage_source, original_power_level, damage_output, hit_zone_name, damage_profile, target_index, boost_curve, boost_damage_multiplier, is_critical_strike, backstab_multiplier, breed, is_dummy, dummy_unit_armor, dropoff_scalar, static_base_damage, is_player_friendly_fire, has_power_boost, difficulty_level, target_unit_armor, target_unit_primary_armor, has_crit_head_shot_killing_blow_perk, has_crit_backstab_killing_blow_perk, target_max_health, target_unit)
+	if damage_profile and damage_profile.no_damage then
+		return 0
+	end
+
+	local difficulty_settings = DifficultySettings[difficulty_level]
+	local power_boost_damage = 0
+	local head_shot_boost_damage = 0
+	local head_shot_min_damage = 1
+	local power_boost_min_damage = 1
+	local multiplier_type = DamageUtils.get_breed_damage_multiplier_type(breed, hit_zone_name, is_dummy)
+	local is_finesse_hit = multiplier_type == "headshot" or multiplier_type == "weakspot" or multiplier_type == "protected_weakspot"
+
+	if is_finesse_hit or is_critical_strike or has_power_boost or (boost_damage_multiplier and boost_damage_multiplier > 0) then
+		local power_boost_armor = nil
+
+		if target_unit_armor == 2 or target_unit_armor == 5 or target_unit_armor == 6 then
+			power_boost_armor = 1
+		else
+			power_boost_armor = target_unit_armor
+		end
+
+		local power_boost_target_damages = damage_output[power_boost_armor] or (power_boost_armor == 0 and 0) or damage_output[1]
+		local preliminary_boost_damage = nil
+
+		if type(power_boost_target_damages) == "table" then
+			local power_boost_damage_range = power_boost_target_damages.max - power_boost_target_damages.min
+			local power_boost_attack_power, _ = ActionUtils.get_power_level_for_target(target_unit, original_power_level, damage_profile, target_index, is_critical_strike, attacker_unit, hit_zone_name, power_boost_armor, damage_source, breed, dummy_unit_armor, dropoff_scalar, difficulty_level, target_unit_armor, target_unit_primary_armor)
+			local power_boost_percentage = ActionUtils.get_power_level_percentage(power_boost_attack_power)
+			preliminary_boost_damage = power_boost_target_damages.min + power_boost_damage_range * power_boost_percentage
+		else
+			preliminary_boost_damage = power_boost_target_damages
+		end
+
+		if is_finesse_hit then
+			head_shot_min_damage = preliminary_boost_damage * 0.5
+		end
+
+		if is_critical_strike then
+			head_shot_min_damage = preliminary_boost_damage * 0.5
+		end
+
+		if has_power_boost or (boost_damage_multiplier and boost_damage_multiplier > 0) then
+			power_boost_damage = preliminary_boost_damage
+		end
+	end
+
+	local damage, target_damages = nil
+	target_damages = (static_base_damage and ((type(damage_output) == "table" and damage_output[1]) or damage_output)) or damage_output[target_unit_armor] or (target_unit_armor == 0 and 0) or damage_output[1]
+
+	if type(target_damages) == "table" then
+		local damage_range = target_damages.max - target_damages.min
+		local percentage = 0
+
+		if damage_profile then
+			local attack_power, _ = ActionUtils.get_power_level_for_target(target_unit, original_power_level, damage_profile, target_index, is_critical_strike, attacker_unit, hit_zone_name, nil, damage_source, breed, dummy_unit_armor, dropoff_scalar, difficulty_level, target_unit_armor, target_unit_primary_armor)
+			percentage = ActionUtils.get_power_level_percentage(attack_power)
+		end
+
+		damage = target_damages.min + damage_range * percentage
+	else
+		damage = target_damages
+	end
+
+	local backstab_damage = nil
+
+	if backstab_multiplier then
+		backstab_damage = (power_boost_damage and damage < power_boost_damage and power_boost_damage * (backstab_multiplier - 1)) or damage * (backstab_multiplier - 1)
+	end
+
+	if not static_base_damage then
+		local power_boost_amount = 0
+		local head_shot_boost_amount = 0
+
+		if has_power_boost then
+			if target_unit_armor == 1 then
+				power_boost_amount = power_boost_amount + 0.75
+			elseif target_unit_armor == 2 then
+				power_boost_amount = power_boost_amount + 0.6
+			elseif target_unit_armor == 3 then
+				power_boost_amount = power_boost_amount + 0.5
+			elseif target_unit_armor == 4 then
+				power_boost_amount = power_boost_amount + 0.5
+			elseif target_unit_armor == 5 then
+				power_boost_amount = power_boost_amount + 0.5
+			elseif target_unit_armor == 6 then
+				power_boost_amount = power_boost_amount + 0.3
+			else
+				power_boost_amount = power_boost_amount + 0.5
+			end
+		end
+
+		if boost_damage_multiplier and boost_damage_multiplier > 0 then
+			if target_unit_armor == 1 then
+				power_boost_amount = power_boost_amount + 0.75
+			elseif target_unit_armor == 2 then
+				power_boost_amount = power_boost_amount + 0.3
+			elseif target_unit_armor == 3 then
+				power_boost_amount = power_boost_amount + 0.75
+			elseif target_unit_armor == 4 then
+				power_boost_amount = power_boost_amount + 0.5
+			elseif target_unit_armor == 5 then
+				power_boost_amount = power_boost_amount + 0.5
+			elseif target_unit_armor == 6 then
+				power_boost_amount = power_boost_amount + 0.2
+			else
+				power_boost_amount = power_boost_amount + 0.5
+			end
+		end
+
+		local target_settings = damage_profile and ((damage_profile.targets and damage_profile.targets[target_index]) or damage_profile.default_target)
+
+		if is_finesse_hit then
+			if damage > 0 then
+				if target_unit_armor == 3 then
+					head_shot_boost_amount = head_shot_boost_amount + ((target_settings and (target_settings.headshot_boost_boss or target_settings.headshot_boost)) or 0.25)
+				else
+					head_shot_boost_amount = head_shot_boost_amount + ((target_settings and target_settings.headshot_boost) or 0.5)
+				end
+			elseif target_unit_primary_armor == 6 and damage == 0 then
+				head_shot_boost_amount = head_shot_boost_amount + (target_settings and (target_settings.headshot_boost_heavy_armor or 0.25))
+			elseif target_unit_armor == 2 and damage == 0 then
+				head_shot_boost_amount = head_shot_boost_amount + ((target_settings and (target_settings.headshot_boost_armor or target_settings.headshot_boost)) or 0.5)
+			end
+
+			if multiplier_type == "protected_weakspot" then
+				head_shot_boost_amount = head_shot_boost_amount * 0.25
+			end
+		end
+
+		if multiplier_type == "protected_spot" then
+			power_boost_amount = power_boost_amount - 0.5
+			head_shot_boost_amount = head_shot_boost_amount - 0.5
+		end
+
+		if damage_profile and damage_profile.no_headshot_boost then
+			head_shot_boost_amount = 0
+		end
+
+		local crit_boost = 0
+
+		if is_critical_strike then
+			crit_boost = (damage_profile and damage_profile.crit_boost) or 0.5
+
+			if damage_profile and damage_profile.no_crit_boost then
+				crit_boost = 0
+			end
+		end
+
+		local attacker_buff_extension = attacker_unit and ScriptUnit.has_extension(attacker_unit, "buff_system")
+
+		if boost_curve and (power_boost_amount > 0 or head_shot_boost_amount > 0 or crit_boost > 0) then
+			local modified_boost_curve, modified_boost_curve_head_shot = nil
+			local boost_coefficient = (target_settings and target_settings.boost_curve_coefficient) or DefaultBoostCurveCoefficient
+			local boost_coefficient_headshot = (target_settings and target_settings.boost_curve_coefficient_headshot) or DefaultBoostCurveCoefficient
+
+			if boost_damage_multiplier and boost_damage_multiplier > 0 then
+				if breed and breed.boost_curve_multiplier_override then
+					boost_damage_multiplier = math.clamp(boost_damage_multiplier, 0, breed.boost_curve_multiplier_override)
+				end
+
+				boost_coefficient = boost_coefficient * boost_damage_multiplier
+				boost_coefficient_headshot = boost_coefficient_headshot * boost_damage_multiplier
+			end
+
+			if power_boost_amount > 0 then
+				modified_boost_curve = DamageUtils.get_modified_boost_curve(boost_curve, boost_coefficient)
+				power_boost_amount = math.clamp(power_boost_amount, 0, 1)
+				local boost_multiplier = DamageUtils.get_boost_curve_multiplier(modified_boost_curve or boost_curve, power_boost_amount)
+				power_boost_damage = math.max(math.max(power_boost_damage, damage), power_boost_min_damage) * boost_multiplier
+			end
+
+			if head_shot_boost_amount > 0 or crit_boost > 0 then
+				local target_unit_buff_extension = target_unit and ScriptUnit.has_extension(target_unit, "buff_system")
+				modified_boost_curve_head_shot = DamageUtils.get_modified_boost_curve(boost_curve, boost_coefficient_headshot)
+				head_shot_boost_amount = math.clamp(head_shot_boost_amount + crit_boost, 0, 1)
+				local head_shot_boost_multiplier = DamageUtils.get_boost_curve_multiplier(modified_boost_curve_head_shot or boost_curve, head_shot_boost_amount)
+				head_shot_boost_damage = math.max(math.max(power_boost_damage, damage), head_shot_min_damage) * head_shot_boost_multiplier
+
+				if attacker_buff_extension and is_critical_strike then
+					head_shot_boost_damage = head_shot_boost_damage * attacker_buff_extension:apply_buffs_to_value(1, "critical_strike_effectiveness")
+				end
+
+				if attacker_buff_extension and is_finesse_hit then
+					head_shot_boost_damage = head_shot_boost_damage * attacker_buff_extension:apply_buffs_to_value(1, "headshot_multiplier")
+				end
+
+				if target_unit_buff_extension and is_finesse_hit then
+					head_shot_boost_damage = head_shot_boost_damage * target_unit_buff_extension:apply_buffs_to_value(1, "headshot_vulnerability")
+				end
+			end
+		end
+
+		if breed and breed.armored_boss_damage_reduction then
+			damage = damage * 0.8
+			power_boost_damage = power_boost_damage * 0.5
+			backstab_damage = backstab_damage and backstab_damage * 0.75
+		end
+
+		if breed and breed.boss_damage_reduction then
+			damage = damage * 0.45
+			power_boost_damage = power_boost_damage * 0.5
+			head_shot_boost_damage = head_shot_boost_damage * 0.5
+			backstab_damage = backstab_damage and backstab_damage * 0.75
+		end
+
+		if breed and breed.lord_damage_reduction then
+			damage = damage * 0.2
+			power_boost_damage = power_boost_damage * 0.25
+			head_shot_boost_damage = head_shot_boost_damage * 0.25
+			backstab_damage = backstab_damage and backstab_damage * 0.5
+		end
+
+		damage = damage + power_boost_damage + head_shot_boost_damage
+
+		if backstab_damage then
+			damage = damage + backstab_damage
+		end
+
+		if attacker_buff_extension then
+			if multiplier_type == "headshot" then
+				damage = attacker_buff_extension:apply_buffs_to_value(damage, "headshot_damage")
+			else
+				damage = attacker_buff_extension:apply_buffs_to_value(damage, "non_headshot_damage")
+			end
+		end
+
+		if is_critical_strike then
+			local killing_blow_triggered = nil
+
+			if hit_zone_name == "head" and has_crit_head_shot_killing_blow_perk then
+				killing_blow_triggered = true
+			elseif backstab_multiplier and backstab_multiplier > 1 and has_crit_backstab_killing_blow_perk then
+				killing_blow_triggered = true
+			end
+
+			if killing_blow_triggered and breed then
+				local boss = breed.boss
+				local primary_armor = breed.primary_armor_category
+
+				if not boss and not primary_armor then
+					if target_max_health then
+						damage = target_max_health
+					else
+						local breed_health_table = breed.max_health
+						local difficulty_rank = difficulty_settings.rank
+						local breed_health = breed_health_table[difficulty_rank]
+						damage = breed_health
+					end
+				end
+			end
+		end
+	end
+
+	if is_player_friendly_fire then
+		local friendly_fire_multiplier = difficulty_settings.friendly_fire_multiplier
+
+		if damage_profile and damage_profile.friendly_fire_multiplier then
+			friendly_fire_multiplier = friendly_fire_multiplier * damage_profile.friendly_fire_multiplier
+		end
+
+		if friendly_fire_multiplier then
+			damage = damage * friendly_fire_multiplier
+		end
+	end
+
+	local heavy_armor_damage = false
+
+	return damage, heavy_armor_damage
+end
+
+mod:hook_origin(DamageUtils, "calculate_damage", function (damage_output, target_unit, attacker_unit, hit_zone_name, original_power_level, boost_curve, boost_damage_multiplier, is_critical_strike, damage_profile, target_index, backstab_multiplier, damage_source)
+	local difficulty_settings = Managers.state.difficulty:get_difficulty_settings()
+	local breed, dummy_unit_armor, is_dummy, unit_max_health = nil
+
+	if target_unit then
+		breed = AiUtils.unit_breed(target_unit)
+		dummy_unit_armor = unit_get_data(target_unit, "armor")
+		is_dummy = unit_get_data(target_unit, "is_dummy")
+		local target_unit_health_extension = ScriptUnit.has_extension(target_unit, "health_system")
+		local is_invincible = target_unit_health_extension and target_unit_health_extension:get_is_invincible() and not is_dummy
+
+		if is_invincible then
+			return 0
+		end
+
+		if target_unit_health_extension and not is_dummy then
+			unit_max_health = target_unit_health_extension:get_max_health()
+		elseif breed then
+			local breed_health_table = breed.max_health
+			local difficulty_rank = difficulty_settings.rank
+			local breed_health = breed_health_table[difficulty_rank]
+			unit_max_health = breed_health
+		end
+	end
+
+	local attacker_breed = nil
+
+	if attacker_unit then
+		attacker_breed = Unit.get_data(attacker_unit, "breed")
+	end
+
+	local static_base_damage = not attacker_breed or not attacker_breed.is_hero
+	local is_player_friendly_fire = not static_base_damage and Managers.state.side:is_player_friendly_fire(attacker_unit, target_unit)
+	local target_is_hero = breed and breed.is_hero
+	local dropoff_scalar = 0
+
+	if damage_profile and not static_base_damage then
+		local target_settings = (damage_profile.targets and damage_profile.targets[target_index]) or damage_profile.default_target
+		dropoff_scalar = ActionUtils.get_dropoff_scalar(damage_profile, target_settings, attacker_unit, target_unit)
+	end
+
+	local buff_extension = attacker_unit and ScriptUnit.has_extension(attacker_unit, "buff_system")
+	local has_power_boost = false
+	local has_crit_head_shot_killing_blow_perk = false
+	local has_crit_backstab_killing_blow_perk = false
+
+	if buff_extension then
+		has_power_boost = buff_extension:has_buff_perk("potion_armor_penetration")
+		has_crit_head_shot_killing_blow_perk = buff_extension:has_buff_perk("crit_headshot_killing_blow")
+		has_crit_backstab_killing_blow_perk = buff_extension:has_buff_perk("crit_backstab_killing_blow")
+	end
+
+	local difficulty_level = Managers.state.difficulty:get_difficulty()
+	local target_unit_armor, target_unit_primary_armor, _ = nil
+
+	if target_is_hero then
+		target_unit_armor = PLAYER_TARGET_ARMOR
+	else
+		target_unit_armor, _, target_unit_primary_armor, _ = ActionUtils.get_target_armor(hit_zone_name, breed, dummy_unit_armor)
+	end
+
+	local calculated_damage = do_damage_calculation(attacker_unit, damage_source, original_power_level, damage_output, hit_zone_name, damage_profile, target_index, boost_curve, boost_damage_multiplier, is_critical_strike, backstab_multiplier, breed, is_dummy, dummy_unit_armor, dropoff_scalar, static_base_damage, is_player_friendly_fire, has_power_boost, difficulty_level, target_unit_armor, target_unit_primary_armor, has_crit_head_shot_killing_blow_perk, has_crit_backstab_killing_blow_perk, unit_max_health, target_unit)
+
+	if damage_profile and not damage_profile.is_dot then
+		local blackboard = BLACKBOARDS[target_unit]
+		local stagger_number = 0
+
+		if blackboard then
+			local ignore_stagger_damage_reduction = damage_profile.no_stagger_damage_reduction or breed.no_stagger_damage_reduction
+			local min_stagger_number = 0
+			local max_stagger_number = 2
+
+			if blackboard.is_climbing then
+				stagger_number = 2
+			else
+				stagger_number = math.min(blackboard.stagger or min_stagger_number, max_stagger_number)
+			end
+
+			if damage_profile.no_stagger_damage_reduction_ranged then
+				local stagger_number_override = 1
+				stagger_number = math.max(stagger_number_override, stagger_number)
+			end
+
+			if not damage_profile.no_stagger_damage_reduction_ranged then
+				stagger_number = apply_buffs_to_stagger_damage(attacker_unit, target_unit, target_index, hit_zone_name, is_critical_strike, stagger_number)
+			end
+		elseif dummy_unit_armor then
+			local target_buff_extension = ScriptUnit.has_extension(target_unit, "buff_system")
+			stagger_number = target_buff_extension:apply_buffs_to_value(0, "dummy_stagger")
+
+			if damage_profile.no_stagger_damage_reduction_ranged then
+				local stagger_number_override = 1
+				stagger_number = math.max(stagger_number_override, stagger_number)
+			end
+
+			if not damage_profile.no_stagger_damage_reduction_ranged then
+				stagger_number = apply_buffs_to_stagger_damage(attacker_unit, target_unit, target_index, hit_zone_name, is_critical_strike, stagger_number)
+			end
+		end
+
+		local min_stagger_damage_coefficient = difficulty_settings.min_stagger_damage_coefficient
+		local stagger_damage_multiplier = difficulty_settings.stagger_damage_multiplier
+
+		if stagger_damage_multiplier then
+			local bonus_damage_percentage = stagger_number * stagger_damage_multiplier
+			local target_buff_extension = ScriptUnit.has_extension(target_unit, "buff_system")
+
+			if target_buff_extension and not damage_profile.no_stagger_damage_reduction_ranged then
+				bonus_damage_percentage = target_buff_extension:apply_buffs_to_value(bonus_damage_percentage, "unbalanced_damage_taken")
+			end
+
+			local stagger_damage = calculated_damage * (min_stagger_damage_coefficient + bonus_damage_percentage)
+			calculated_damage = stagger_damage
+		end
+	end
+
+	local weave_manager = Managers.weave
+
+	if target_is_hero and static_base_damage and weave_manager:get_active_weave() then
+		local scaling_value = weave_manager:get_scaling_value("enemy_damage")
+		calculated_damage = calculated_damage * (1 + scaling_value)
+	end
+
+	return calculated_damage
+end)
 
 -- Talent Changes
 function mod.modify_talent(self, career_name, tier, index, new_talent_data)
