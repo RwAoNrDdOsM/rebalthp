@@ -396,14 +396,49 @@ function mod.add_proc_function(self, name, func)
     ProcFunctions[name] = func
 end
 
+mod:add_proc_function("rebalthp_heal_finesse_damage_on_melee", function (player, buff, params)
+	if not Managers.state.network.is_server then
+		return
+	end
+
+	local player_unit = player.player_unit
+	local heal_amount_crit = buff.bonus_crit
+	local heal_amount_hs = buff.bonus_hs
+	local has_procced = buff.has_procced
+	local hit_unit = params[1]
+	local hit_zone_name = params[3]
+	local target_number = params[4]
+	local attack_type = params[2]
+	local critical_hit = params[6]
+	local breed = AiUtils.unit_breed(hit_unit)
+
+	if target_number == 1 then
+		buff.has_procced = false
+		has_procced = false
+	end
+
+	if ALIVE[player_unit] and breed and (attack_type == "light_attack" or attack_type == "heavy_attack") and not has_procced then
+		if hit_zone_name == "head" or hit_zone_name == "neck" or hit_zone_name == "weakspot" then
+			buff.has_procced = true
+
+			DamageUtils.heal_network(player_unit, player_unit, heal_amount_hs, "heal_from_proc")
+		end
+
+		if critical_hit then
+			DamageUtils.heal_network(player_unit, player_unit, heal_amount_crit, "heal_from_proc")
+
+			buff.has_procced = true
+		end
+	end
+end)
 mod:add_buff_template("rebalthp_regrowth", {
 	name = "regrowth",
 	event_buff = true,
-	buff_func = "reablthp_heal_finesse_damage_on_melee",
+	buff_func = "rebalthp_heal_finesse_damage_on_melee",
 	event = "on_hit",
 	perk = "ninja_healing",
-	bonus_hs = 2,
-	bonus_crit = 1,
+	bonus_hs = 3.5,
+	bonus_crit = 1.5,
 })
 mod:add_proc_function("rebalthp_heal_stagger_targets_on_melee", function (player, buff, params)
 	if not Managers.state.network.is_server then
@@ -418,18 +453,21 @@ mod:add_proc_function("rebalthp_heal_stagger_targets_on_melee", function (player
 		local attack_type = damage_profile.charge_value
 		local stagger_value = params[6]
 		local stagger_type = params[4]
+		local buff_type = params[7]
 		local target_index = params[8]
 		local breed = AiUtils.unit_breed(hit_unit)
 		local multiplier = buff.multiplier
 		local is_push = damage_profile.is_push
 		local stagger_calulation = stagger_type or stagger_value
 		local heal_amount = stagger_value * multiplier
+		local health_extension = ScriptUnit.extension(hit_unit, "health_system")
+		local current_health = health_extension:current_health()
 
 		if is_push then
 			heal_amount = 0.6
 		end
 
-		if target_index and target_index < 5 and breed and not breed.is_hero and (attack_type == "light_attack" or attack_type == "heavy_attack" or attack_type == "action_push") then
+		if target_index and target_index < 5 and breed and not breed.is_hero and (attack_type == "light_attack" or attack_type == "heavy_attack" or attack_type == "action_push") and current_health > 0 then
 			DamageUtils.heal_network(player_unit, player_unit, heal_amount, "heal_from_proc")
 		end
 	end

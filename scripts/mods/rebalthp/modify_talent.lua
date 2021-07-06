@@ -2,10 +2,10 @@ local mod = get_mod("rebalthp")
 
 --Text Localization
 mod:add_text("bloodlust_name", "Bloodlust")
-mod:add_text("reaper_name", "Reaper")
+mod:add_text("regrowth_name", "Reaper")
 mod:add_text("vanguard_name", "Vanguard")
 mod:add_text("regrowth_name", "Regrowth")
-mod:add_text("rebalthp_regrowth_desc", "Melee critical stikes restore 1 temporary health. Melee headshot restore 2 temporary health. Critical headshots restore 3 temporary health.")
+mod:add_text("rebalthp_regrowth_desc", "Melee critical stikes gives you 1.5 temporary health and melee headshots restore 3.5 temporary health. Mellee critical headshots restore 5 temporary health.")
 mod:add_text("smiter_name", "Smiter")
 mod:add_text("enhanced_power_name", "Enhanced Power")
 mod:add_text("assassin_name", "Assassin")
@@ -35,11 +35,12 @@ mod:modify_talent("es_huntsman", 1, 2, {
 	},
 })
 mod:modify_talent("es_huntsman", 1, 3, {
-	name = "bloodlust_name",
-	description = "bloodlust_desc_3",
+	name = "regrowth_name",
+	description = "rebalthp_regrowth_desc",
 	buffs = {
-		"rebalthp_bloodlust"
-	}
+		"rebalthp_regrowth"
+	},
+	description_values = {},
 })
 mod:modify_talent("es_huntsman", 3, 1, {
 	name = "enhanced_power_name",
@@ -506,11 +507,12 @@ mod:modify_talent("dr_ranger", 1, 2, {
 	},
 })
 mod:modify_talent("dr_ranger", 1, 3, {
-	name = "bloodlust_name",
-	description = "bloodlust_desc_3",
+	name = "regrowth_name",
+	description = "rebalthp_regrowth_desc",
 	buffs = {
-		"rebalthp_bloodlust"
-	}
+		"rebalthp_regrowth"
+	},
+	description_values = {},
 })
 mod:modify_talent("dr_ranger", 3, 1, {
 	name = "enhanced_power_name",
@@ -581,11 +583,12 @@ mod:modify_talent("dr_engineer", 1, 2, {
 	},
 })
 mod:modify_talent("dr_engineer", 1, 3, {
-	name = "bloodlust_name",
-	description = "bloodlust_desc_3",
+	name = "regrowth_name",
+	description = "rebalthp_regrowth_desc",
 	buffs = {
-		"rebalthp_bloodlust"
-	}
+		"rebalthp_regrowth"
+	},
+	description_values = {},
 })
 mod:modify_talent("dr_engineer", 3, 1, {
 	name = "enhanced_power_name",
@@ -813,11 +816,12 @@ mod:modify_talent("we_waywatcher", 1, 2, {
 	},
 })
 mod:modify_talent("we_waywatcher", 1, 3, {
-	name = "bloodlust_name",
-	description = "bloodlust_desc_3",
+	name = "regrowth_name",
+	description = "rebalthp_regrowth_desc",
 	buffs = {
-		"rebalthp_bloodlust"
-	}
+		"rebalthp_regrowth"
+	},
+	description_values = {},
 })
 mod:modify_talent("we_waywatcher", 3, 1, {
 	name = "enhanced_power_name",
@@ -1038,11 +1042,12 @@ mod:modify_talent("wh_bountyhunter", 1, 2, {
 	},
 })
 mod:modify_talent("wh_bountyhunter", 1, 3, {
-	name = "bloodlust_name",
-	description = "bloodlust_desc_3",
+	name = "regrowth_name",
+	description = "rebalthp_regrowth_desc",
 	buffs = {
-		"rebalthp_bloodlust"
-	}
+		"rebalthp_regrowth"
+	},
+	description_values = {},
 })
 mod:modify_talent("wh_bountyhunter", 3, 1, {
 	name = "enhanced_power_name",
@@ -1188,11 +1193,12 @@ mod:modify_talent("bw_scholar", 1, 2, {
 	},
 })
 mod:modify_talent("bw_scholar", 1, 3, {
-	name = "bloodlust_name",
-	description = "bloodlust_desc_3",
+	name = "regrowth_name",
+	description = "rebalthp_regrowth_desc",
 	buffs = {
-		"rebalthp_bloodlust"
-	}
+		"rebalthp_regrowth"
+	},
+	description_values = {},
 })
 mod:modify_talent("bw_scholar", 3, 1, {
 	name = "enhanced_power_name",
@@ -1270,11 +1276,12 @@ mod:modify_talent("bw_adept", 1, 2, {
 	},
 })
 mod:modify_talent("bw_adept", 1, 3, {
-	name = "bloodlust_name",
-	description = "bloodlust_desc_3",
+	name = "regrowth_name",
+	description = "rebalthp_regrowth_desc",
 	buffs = {
-		"rebalthp_bloodlust"
-	}
+		"rebalthp_regrowth"
+	},
+	description_values = {},
 })
 mod:modify_talent("bw_adept", 3, 1, {
 	name = "enhanced_power_name",

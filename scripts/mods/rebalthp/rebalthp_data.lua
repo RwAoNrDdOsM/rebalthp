@@ -1,7 +1,7 @@
 local mod = get_mod("rebalthp")
 
 return {
-	name = "rebalthp",
+	name = "THP & Stagger Talents Rebalance",
 	description = mod:localize("mod_description"),
-	is_togglable = true,
+	is_togglable = false,
 }
