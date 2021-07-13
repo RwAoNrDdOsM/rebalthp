@@ -325,11 +325,9 @@ mod:hook_origin(DamageUtils, "server_apply_hit", function (t, attacker_unit, tar
 
 		
 		DamageUtils.add_damage_network_player(damage_profile, target_index, attack_power_level, target_unit, attacker_unit, hit_zone_name, hit_position, attack_direction, damage_source, hit_ragdoll_actor, boost_curve_multiplier, is_critical_strike, added_dot, first_hit, total_hits, backstab_multiplier, source_attacker_unit)
-		if not AiUtils.unit_alive(target_unit) then -- If it dies make it say it just died but with hacky fix to track if an enemy has already died
-			if dead_units[target_unit] == nil then
-				just_died = true
-				dead_units[target_unit] = true
-			end
+		
+		if not AiUtils.unit_alive(target_unit) then -- If it dies make it say it just died
+			just_died = true
 		end
 	elseif shield_breaking_hit then
 		local shield_extension = ScriptUnit.has_extension(target_unit, "ai_shield_system")
@@ -348,7 +346,7 @@ mod:hook_origin(DamageUtils, "server_apply_hit", function (t, attacker_unit, tar
 			stagger_power_level = 0
 		end
 
-		DamageUtils.stagger_ai(t, damage_profile, target_index, stagger_power_level, target_unit, attacker_unit, hit_zone_name, attack_direction, boost_curve_multiplier, is_critical_strike, blocking, damage_source, just_died) -- parse through to see if the enemy jsut died
+		DamageUtils.stagger_ai(t, damage_profile, target_index, stagger_power_level, target_unit, attacker_unit, hit_zone_name, attack_direction, boost_curve_multiplier, is_critical_strike, blocking, damage_source)
 	end
 
 	if unit_get_data(target_unit, "is_dummy") and not damage_profile.no_stagger and can_stagger then
@@ -374,182 +372,6 @@ mod:hook_origin(DamageUtils, "server_apply_hit", function (t, attacker_unit, tar
 
 				attacker_buff_extension:trigger_procs("on_stagger", target_unit, damage_profile, attacker_unit, 1, 1, stagger_value, buff_type, target_index, just_died)
 			end
-		end
-	end
-end)
-
-local function add_stagger_hit(blackboard, t)
-	local stagger_immunity = blackboard.stagger_immunity
-
-	if not stagger_immunity then
-		return
-	end
-
-	local num_attacks_needed = stagger_immunity.num_attacks
-	local num_hits = stagger_immunity.num_hits or 0
-	num_hits = num_hits + 1
-
-	if num_hits == num_attacks_needed then
-		stagger_immunity.stagger_immune_at = t
-		stagger_immunity.stagger_immune_at_health = blackboard.current_health_percent
-		stagger_immunity.debug_damage_left = stagger_immunity.damage_threshold
-		num_hits = 0
-	end
-
-	stagger_immunity.num_hits = num_hits
-end
-
-local function is_stagger_immune(blackboard, t)
-	local stagger_immunity = blackboard.stagger_immunity
-
-	if not stagger_immunity then
-		return false
-	end
-
-	local health_percent = blackboard.current_health_percent
-	local health_threshold = stagger_immunity.health_threshold
-
-	if health_threshold and health_threshold < health_percent then
-		return true
-	end
-
-	local damage_left = 0
-	local stagger_immune_at_health = stagger_immunity.stagger_immune_at_health
-
-	if stagger_immune_at_health then
-		local damage_threshold = stagger_immunity.damage_threshold
-		local damage_accumulated = stagger_immune_at_health - health_percent
-		damage_left = damage_threshold - damage_accumulated
-		stagger_immunity.debug_damage_left = damage_left
-	end
-
-	local time_left = 0
-	local stagger_immune_at = stagger_immunity.stagger_immune_at
-
-	if stagger_immune_at then
-		local stagger_immune_until = stagger_immune_at + stagger_immunity.time or 0
-		time_left = stagger_immune_until - t
-	end
-
-	if damage_left > 0 and time_left > 0 then
-		return true
-	end
-
-	return false
-end
-
-local function action_ignores_stagger(blackboard, attack_template, stagger_type, target_unit, is_player)
-	local status_extension = ScriptUnit.has_extension(target_unit, "status_system")
-	local action = (is_player and status_extension:breed_action()) or blackboard.action
-	local ignore_staggers = action and action.ignore_staggers
-
-	if blackboard.anim_cb_stagger_immune then
-		return true
-	end
-
-	if not ignore_staggers or attack_template.always_stagger then
-		return false
-	end
-
-	if ignore_staggers.allow_push and attack_template.is_push then
-		return false
-	end
-
-	local ignore_stagger = ignore_staggers[stagger_type]
-
-	if type(ignore_stagger) == "table" then
-		local type = ignore_stagger.type
-
-		if type == "ignore_by_health" then
-			local health_percent = blackboard.current_health_percent
-			local health_threshold = ignore_stagger.health
-			local health_ignore_stagger = health_threshold.min < health_percent and health_percent <= health_threshold.max
-
-			return health_ignore_stagger
-		elseif type == "reset_attack" then
-			blackboard.reset_attack = true
-			blackboard.reset_attack_delay = ignore_stagger.delay
-
-			return true
-		end
-	elseif type(ignore_stagger) == "boolean" then
-		return ignore_stagger
-	else
-		error("action_ignores_stagger: unsupported type")
-	end
-end
-
-mod:hook_origin(DamageUtils, "stagger_ai", function (t, damage_profile, target_index, power_level, target_unit, attacker_unit, hit_zone_name, attack_direction, boost_curve_multiplier, is_critical_strike, blocked, damage_source, just_died) --carry just_died value
-	if not DamageUtils.is_enemy(attacker_unit, target_unit) then
-		return
-	end
-
-	local ai_extension = ScriptUnit.has_extension(target_unit, "ai_system")
-	local blackboard = (ai_extension and ai_extension:blackboard()) or BLACKBOARDS[target_unit]
-
-	if not blackboard then
-		return
-	end
-
-	local is_hero_player = blackboard.breed.is_hero and not ai_extension
-
-	if is_hero_player then
-		return
-	end
-
-	if is_stagger_immune(blackboard, t) then
-		return
-	end
-
-	local target_settings = (damage_profile.targets and damage_profile.targets[target_index]) or damage_profile.default_target
-	local attack_template_name = target_settings.attack_template
-	local attack_template = AttackTemplates[attack_template_name]
-	local stagger_type, stagger_duration, stagger_length, stagger_value = DamageUtils.calculate_stagger_player(ImpactTypeOutput, target_unit, attacker_unit, hit_zone_name, power_level, boost_curve_multiplier, is_critical_strike, damage_profile, target_index, blocked, damage_source)
-	local is_push = damage_profile.is_push
-
-	if stagger_type == 0 then
-		return
-	end
-
-	local is_player = blackboard.is_player and not ai_extension
-
-	if action_ignores_stagger(blackboard, attack_template, stagger_type, target_unit, is_player) then
-		return
-	end
-
-	if not is_player then
-		add_stagger_hit(blackboard, t)
-	end
-
-	local stagger_angle = attack_template.stagger_angle
-	local target_unit_position = POSITION_LOOKUP[target_unit] or unit_world_position(target_unit, 0)
-	local attacker_position = POSITION_LOOKUP[attacker_unit] or unit_world_position(attacker_unit, 0)
-
-	if stagger_angle == "down" or (stagger_angle == "smiter" and blocked) then
-		attack_direction = Vector3.normalize(target_unit_position - attacker_position)
-		attack_direction.z = -1
-	elseif stagger_angle == "stab" or stagger_angle == "smiter" or blocked then
-		attack_direction = Vector3.normalize(target_unit_position - attacker_position)
-	elseif stagger_angle == "pull" then
-		attack_direction = Vector3.normalize(attacker_position - target_unit_position)
-	end
-
-	if stagger_type > 0 then
-		if is_player then
-			DamageUtils.stagger_player(target_unit, blackboard.breed, attack_direction, stagger_length, stagger_type, stagger_duration, attack_template.stagger_animation_scale, t, stagger_value, attack_template.always_stagger, is_push)
-		else
-			AiUtils.stagger(target_unit, blackboard, attacker_unit, attack_direction, stagger_length, stagger_type, stagger_duration, attack_template.stagger_animation_scale, t, stagger_value, attack_template.always_stagger, is_push)
-		end
-
-		local attacker_buff_extension = attacker_unit and ScriptUnit.has_extension(attacker_unit, "buff_system")
-
-		if attacker_buff_extension then
-			local item_data = rawget(ItemMasterList, damage_source)
-			local weapon_template_name = item_data and item_data.template
-			local weapon_template = weapon_template_name and Weapons[weapon_template_name]
-			local buff_type = (weapon_template and weapon_template.buff_type) or nil
-
-			attacker_buff_extension:trigger_procs("on_stagger", target_unit, damage_profile, attacker_unit, stagger_type, stagger_duration, stagger_value, buff_type, target_index, just_died) --carry just_died valueu through to trigger params
 		end
 	end
 end)
@@ -634,22 +456,21 @@ mod:add_proc_function("rebalthp_heal_stagger_targets_on_melee", function (player
 		local stagger_type = params[4]
 		local buff_type = params[7]
 		local target_index = params[8]
-		local just_died = params[9]
 		local breed = AiUtils.unit_breed(hit_unit)
 		local multiplier = buff.multiplier
 		local is_push = damage_profile.is_push
 		local stagger_calulation = stagger_type or stagger_value
 		local heal_amount = stagger_value * multiplier
-		local health_extension = ScriptUnit.extension(hit_unit, "health_system")
-		local current_health = health_extension:current_health()
-		local can_proc = current_health == 0 and just_died or current_health > 0 
+		local death_extension = ScriptUnit.has_extension(hit_unit, "death_system")
+		local not_corpse = death_extension.death_is_done == nil
 
 		if is_push then
 			heal_amount = 0.6
 		end
 
-		if target_index and target_index < 5 and breed and not breed.is_hero and (attack_type == "light_attack" or attack_type == "heavy_attack" or attack_type == "action_push") and can_proc then
+		if target_index and target_index < 5 and breed and not breed.is_hero and (attack_type == "light_attack" or attack_type == "heavy_attack" or attack_type == "action_push") and not_corpse then
 			DamageUtils.heal_network(player_unit, player_unit, heal_amount, "heal_from_proc")
+			mod:echo(heal_amount)
 		end
 	end
 end)
